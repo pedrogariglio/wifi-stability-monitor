@@ -1,0 +1,21 @@
+# Logs generados por el sistema — no versionar datos de producción
+*.log
+*.csv
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Variables de entorno (tokens de Telegram, etc.)
+.env
+*.env
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo

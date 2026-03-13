@@ -1,0 +1,8 @@
+[Unit]
+Description=WiFi Metrics Collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/wifi-metrics.sh

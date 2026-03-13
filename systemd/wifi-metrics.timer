@@ -1,0 +1,10 @@
+[Unit]
+Description=WiFi Metrics Collector — cada 30 segundos
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=30s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
