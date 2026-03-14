@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WiFi Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0a0e14;
+    --surface:   #111820;
+    --border:    #1e2d3d;
+    --accent:    #00d4ff;
+    --green:     #00e676;
+    --yellow:    #ffd740;
+    --red:       #ff5252;
+    --muted:     #4a6278;
+    --text:      #cdd9e5;
+    --text-dim:  #637589;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* Fondo con grid sutil */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .header-left h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+
+  .header-left p {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 2px;
+    border: 1px solid;
+    transition: all 0.4s ease;
+  }
+
+  .status-badge.conectado  { color: var(--green);  border-color: var(--green);  background: rgba(0,230,118,0.06); }
+  .status-badge.desconectado { color: var(--red);  border-color: var(--red);    background: rgba(255,82,82,0.06); }
+  .status-badge.degradado  { color: var(--yellow); border-color: var(--yellow); background: rgba(255,215,64,0.06); }
+  .status-badge.cargando   { color: var(--muted);  border-color: var(--muted);  background: transparent; }
+
+  .pulse {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    animation: pulsar 1.6s ease-in-out infinite;
+  }
+  .conectado  .pulse { background: var(--green); }
+  .desconectado .pulse { background: var(--red); animation: none; }
+  .degradado  .pulse { background: var(--yellow); }
+  .cargando   .pulse { background: var(--muted); animation: none; }
+
+  @keyframes pulsar {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  .last-update {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* KPI Grid */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  @media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 500px) { .kpi-grid { grid-template-columns: 1fr; } }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--border);
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-top-color 0.4s ease;
+  }
+
+  .kpi-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
+
+  .kpi-card.verde  { border-top-color: var(--green); }
+  .kpi-card.verde::after  { background: radial-gradient(ellipse at top, rgba(0,230,118,0.05), transparent 70%); opacity: 1; }
+
+  .kpi-card.amarillo { border-top-color: var(--yellow); }
+  .kpi-card.amarillo::after { background: radial-gradient(ellipse at top, rgba(255,215,64,0.05), transparent 70%); opacity: 1; }
+
+  .kpi-card.rojo   { border-top-color: var(--red); }
+  .kpi-card.rojo::after   { background: radial-gradient(ellipse at top, rgba(255,82,82,0.05), transparent 70%); opacity: 1; }
+
+  .kpi-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+
+  .kpi-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text);
+    transition: color 0.4s ease;
+  }
+
+  .kpi-card.verde  .kpi-value { color: var(--green); }
+  .kpi-card.amarillo .kpi-value { color: var(--yellow); }
+  .kpi-card.rojo   .kpi-value { color: var(--red); }
+
+  .kpi-unit {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-dim);
+    margin-left: 4px;
+  }
+
+  .kpi-desc {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 8px;
+  }
+
+  .semaforo-dot {
+    position: absolute;
+    top: 18px; right: 18px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+  .verde   .semaforo-dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .amarillo .semaforo-dot { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+  .rojo    .semaforo-dot { background: var(--red); box-shadow: 0 0 8px var(--red); }
+
+  /* Stat secundario (caídas hoy) */
+  .stat-bar {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .stat-pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+  }
+
+  .stat-pill span:first-child { color: var(--text-dim); }
+  .stat-pill strong { color: var(--text); font-size: 15px; }
+
+  /* Charts */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  @media (max-width: 800px) { .charts-grid { grid-template-columns: 1fr; } }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 20px;
+  }
+
+  .chart-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+
+  .chart-wrap { position: relative; height: 160px; }
+
+  /* Selector de ventana temporal */
+  .time-selector {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .time-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 6px 14px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .time-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .time-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.06); }
+
+  /* Footer */
+  footer {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="header-left">
+      <h1>// WIFI_MONITOR</h1>
+      <p>HP EliteDesk · wlp6s0 · Ubuntu Linux</p>
+    </div>
+    <div class="header-right">
+      <div class="status-badge cargando" id="status-badge">
+        <span class="pulse"></span>
+        <span id="status-text">Conectando...</span>
+      </div>
+      <span class="last-update" id="last-update">—</span>
+    </div>
+  </header>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card" id="card-latencia">
+      <div class="semaforo-dot"></div>
+      <div class="kpi-label">Latencia</div>
+      <div class="kpi-value">—<span class="kpi-unit">ms</span></div>
+      <div class="kpi-desc">Promedio últimos 30 min</div>
+    </div>
+    <div class="kpi-card" id="card-signal">
+      <div class="semaforo-dot"></div>
+      <div class="kpi-label">Señal WiFi</div>
+      <div class="kpi-value">—<span class="kpi-unit">dBm</span></div>
+      <div class="kpi-desc">Valor actual</div>
+    </div>
+    <div class="kpi-card" id="card-loss">
+      <div class="semaforo-dot"></div>
+      <div class="kpi-label">Packet Loss</div>
+      <div class="kpi-value">—<span class="kpi-unit">%</span></div>
+      <div class="kpi-desc">Promedio últimos 30 min</div>
+    </div>
+    <div class="kpi-card" id="card-uptime">
+      <div class="semaforo-dot"></div>
+      <div class="kpi-label">Uptime</div>
+      <div class="kpi-value">—<span class="kpi-unit">%</span></div>
+      <div class="kpi-desc">Uptime del día</div>
+    </div>
+  </div>
+
+  <!-- Stats secundarios -->
+  <div class="stat-bar">
+    <div class="stat-pill">
+      <span>Caídas hoy</span>
+      <strong id="caidas-hoy">—</strong>
+    </div>
+    <div class="stat-pill">
+      <span>Último registro</span>
+      <strong id="ultimo-registro">—</strong>
+    </div>
+    <div class="stat-pill">
+      <span>Intervalo</span>
+      <strong>30 s</strong>
+    </div>
+  </div>
+
+  <!-- Selector de ventana temporal -->
+  <div class="time-selector">
+    <button class="time-btn" data-horas="1">1h</button>
+    <button class="time-btn active" data-horas="3">3h</button>
+    <button class="time-btn" data-horas="6">6h</button>
+    <button class="time-btn" data-horas="12">12h</button>
+    <button class="time-btn" data-horas="24">24h</button>
+  </div>
+
+  <!-- Gráficos -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Latencia (ms)</div>
+      <div class="chart-wrap"><canvas id="chart-latencia"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Señal WiFi (dBm)</div>
+      <div class="chart-wrap"><canvas id="chart-signal"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Packet Loss (%)</div>
+      <div class="chart-wrap"><canvas id="chart-loss"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Eventos</div>
+      <div class="chart-wrap"><canvas id="chart-eventos"></canvas></div>
+    </div>
+  </div>
+
+  <footer>wifi-stability-monitor · actualización cada 30s · datos desde /var/log/wifi-metrics.csv</footer>
+</div>
+
+<script>
+const API = 'http://localhost:8088';
+let horasActivas = 3;
+let charts = {};
+
+// --- Chart.js defaults ---
+Chart.defaults.color = '#4a6278';
+Chart.defaults.borderColor = '#1e2d3d';
+Chart.defaults.font.family = "'Space Mono', monospace";
+Chart.defaults.font.size = 10;
+
+function makeChart(id, type, color, options = {}) {
+  const ctx = document.getElementById(id).getContext('2d');
+  return new Chart(ctx, {
+    type,
+    data: { labels: [], datasets: [{ data: [], borderColor: color, backgroundColor: color + '18', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: true }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false }, tooltip: {
+        backgroundColor: '#111820', borderColor: '#1e2d3d', borderWidth: 1,
+        titleColor: '#cdd9e5', bodyColor: '#4a6278',
+        callbacks: { title: items => items[0].label.slice(11, 16) }
+      }},
+      scales: {
+        x: { display: false },
+        y: { grid: { color: '#1e2d3d' }, ticks: { maxTicksLimit: 4 }, ...options.y }
+      },
+      ...options.extra
+    }
+  });
+}
+
+function initCharts() {
+  charts.latencia = makeChart('chart-latencia', 'line', '#00d4ff', { y: { suggestedMin: 0 } });
+  charts.signal   = makeChart('chart-signal',   'line', '#a78bfa', { y: { suggestedMax: -40, suggestedMin: -90 } });
+  charts.loss     = makeChart('chart-loss',     'line', '#ffd740', { y: { suggestedMin: 0, suggestedMax: 100 } });
+
+  // Eventos: bar chart con colores por estado
+  const ctxEv = document.getElementById('chart-eventos').getContext('2d');
+  charts.eventos = new Chart(ctxEv, {
+    type: 'bar',
+    data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 0 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false }, tooltip: {
+        backgroundColor: '#111820', borderColor: '#1e2d3d', borderWidth: 1,
+        titleColor: '#cdd9e5', bodyColor: '#4a6278',
+        callbacks: {
+          title: items => items[0].label.slice(11, 16),
+          label: item => item.raw === 1 ? 'ok' : item.raw === 2 ? 'degradado' : 'caída'
+        }
+      }},
+      scales: {
+        x: { display: false },
+        y: { display: false, min: 0, max: 3 }
+      }
+    }
+  });
+}
+
+function updateChart(chart, labels, data) {
+  chart.data.labels = labels;
+  chart.data.datasets[0].data = data;
+  chart.update('none');
+}
+
+function eventoToNum(e) {
+  if (e === 'ok') return 1;
+  if (e === 'degradado') return 2;
+  return 3;
+}
+
+function eventoToColor(e) {
+  if (e === 'ok') return '#00e67618';
+  if (e === 'degradado') return '#ffd74080';
+  return '#ff525280';
+}
+
+// --- Actualizar KPIs ---
+async function fetchKPIs() {
+  try {
+    const res = await fetch(`${API}/api/kpis`);
+    const d = await res.json();
+
+    // Badge de estado
+    const badge = document.getElementById('status-badge');
+    badge.className = `status-badge ${d.estado_actual}`;
+    document.getElementById('status-text').textContent = d.estado_actual.toUpperCase();
+
+    // Último registro
+    const ts = d.ultimo_registro.replace('T', ' ');
+    document.getElementById('ultimo-registro').textContent = ts.slice(11, 19);
+    document.getElementById('last-update').textContent = 'actualizado ' + new Date().toLocaleTimeString('es-AR');
+
+    // KPI cards
+    setKPI('card-latencia', d.latencia_ms.valor, d.latencia_ms.semaforo, 'ms');
+    setKPI('card-signal',   d.signal_dbm.valor,  d.signal_dbm.semaforo,  'dBm');
+    setKPI('card-loss',     d.packet_loss.valor,  d.packet_loss.semaforo, '%');
+    setKPI('card-uptime',   d.uptime.valor,       d.uptime.semaforo,      '%');
+
+    document.getElementById('caidas-hoy').textContent = d.caidas_hoy;
+  } catch(e) {
+    document.getElementById('status-badge').className = 'status-badge cargando';
+    document.getElementById('status-text').textContent = 'Sin conexión al API';
+  }
+}
+
+function setKPI(cardId, valor, semaforo, unit) {
+  const card = document.getElementById(cardId);
+  card.className = `kpi-card ${semaforo}`;
+  const valEl = card.querySelector('.kpi-value');
+  const display = valor !== null && valor !== undefined ? valor : '—';
+  valEl.innerHTML = `${display}<span class="kpi-unit">${unit}</span>`;
+}
+
+// --- Actualizar gráficos ---
+async function fetchHistorico() {
+  try {
+    const res = await fetch(`${API}/api/historico?horas=${horasActivas}`);
+    const d = await res.json();
+
+    updateChart(charts.latencia, d.timestamps, d.latencia_ms);
+    updateChart(charts.signal,   d.timestamps, d.signal_dbm);
+    updateChart(charts.loss,     d.timestamps, d.packet_loss_pct);
+
+    // Eventos
+    charts.eventos.data.labels = d.timestamps;
+    charts.eventos.data.datasets[0].data = d.eventos.map(eventoToNum);
+    charts.eventos.data.datasets[0].backgroundColor = d.eventos.map(eventoToColor);
+    charts.eventos.update('none');
+  } catch(e) { console.error('Error al cargar histórico', e); }
+}
+
+// --- Selector de tiempo ---
+document.querySelectorAll('.time-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    horasActivas = parseInt(btn.dataset.horas);
+    fetchHistorico();
+  });
+});
+
+// --- Init y polling ---
+initCharts();
+fetchKPIs();
+fetchHistorico();
+setInterval(() => { fetchKPIs(); fetchHistorico(); }, 30000);
+</script>
+</body>
+</html>

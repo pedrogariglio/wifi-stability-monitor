@@ -13,7 +13,7 @@ CSV="/var/log/wifi-metrics.csv"
 
 # --- Crear cabecera si el archivo no existe ---
 if [ ! -f "$CSV" ]; then
-    echo "timestamp,estado,latencia_ms,signal_dbm,evento" >> "$CSV"
+    echo "timestamp,estado,latencia_ms,signal_dbm,packet_loss_pct,evento" >> "$CSV"
 fi
 
 # --- Timestamp ---
@@ -27,10 +27,19 @@ SIGNAL=$(iwconfig "$IFACE" 2>/dev/null \
 
 [ -z "$SIGNAL" ] && SIGNAL="-"
 
-# --- Latencia (ping) y estado de conexión ---
+# --- Ping: latencia, packet loss y estado ---
 PING_OUTPUT=$(ping -c 2 -W 3 "$TARGET" 2>/dev/null)
+RECEIVED=$(echo "$PING_OUTPUT" | grep -oP '\d+ received' | grep -oP '\d+')
 
-if echo "$PING_OUTPUT" | grep -q "2 received"; then
+# Packet loss
+case "$RECEIVED" in
+    2) PACKET_LOSS=0  ;;
+    1) PACKET_LOSS=50 ;;
+    *) PACKET_LOSS=100 ;;
+esac
+
+# Estado, latencia y evento
+if [ "$RECEIVED" = "2" ]; then
     ESTADO="conectado"
     LATENCIA=$(echo "$PING_OUTPUT" \
         | grep "rtt" \
@@ -38,6 +47,14 @@ if echo "$PING_OUTPUT" | grep -q "2 received"; then
         | cut -d'.' -f1)
     [ -z "$LATENCIA" ] && LATENCIA="-"
     EVENTO="ok"
+elif [ "$RECEIVED" = "1" ]; then
+    ESTADO="degradado"
+    LATENCIA=$(echo "$PING_OUTPUT" \
+        | grep "rtt" \
+        | sed 's/.*= [0-9.]*\/\([0-9.]*\)\/.*/\1/' \
+        | cut -d'.' -f1)
+    [ -z "$LATENCIA" ] && LATENCIA="-"
+    EVENTO="degradado"
 else
     ESTADO="desconectado"
     LATENCIA="-"
@@ -45,4 +62,4 @@ else
 fi
 
 # --- Escribir línea en CSV ---
-echo "$TIMESTAMP,$ESTADO,$LATENCIA,$SIGNAL,$EVENTO" >> "$CSV"
+echo "$TIMESTAMP,$ESTADO,$LATENCIA,$SIGNAL,$PACKET_LOSS,$EVENTO" >> "$CSV"
