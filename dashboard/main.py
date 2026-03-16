@@ -1,16 +1,28 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
+import httpx
 from datetime import datetime, timedelta
 from pathlib import Path
 
 # ==============================================================================
 # wifi-dashboard — Backend FastAPI
 # Ubicación: ~/wifi-stability-monitor/dashboard/main.py
-# Ejecutar: uvicorn main:app --reload --host 0.0.0.0 --port 8088
+# Ejecutar: uvicorn dashboard.main:app --host 0.0.0.0 --port 8088
 # ==============================================================================
 
 CSV_PATH = Path("/var/log/wifi-metrics.csv")
+
+# --- Configuración Telegram ----------------------------------------------------
+TELEGRAM_TOKEN   = "8665536298:AAHiN_Ydfgm0h28FGaIOhlV41SzCSnjRG7M"
+TELEGRAM_CHAT_ID = "5672625794"
+TELEGRAM_URL     = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+
+# Cooldown: no repetir la misma alerta dentro de este tiempo
+COOLDOWN_MINUTOS = 15
+
+# Registro de última alerta enviada por tipo
+_ultimo_alerta: dict[str, datetime] = {}
 
 app = FastAPI(title="WiFi Stability Monitor")
 
@@ -20,6 +32,61 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# --- Telegram ------------------------------------------------------------------
+
+def enviar_alerta(tipo: str, mensaje: str):
+    """Envía alerta por Telegram respetando el cooldown por tipo."""
+    ahora = datetime.now()
+    ultima = _ultimo_alerta.get(tipo)
+    if ultima and (ahora - ultima) < timedelta(minutes=COOLDOWN_MINUTOS):
+        return  # En cooldown, no spamear
+    try:
+        with httpx.Client(timeout=5) as client:
+            client.post(TELEGRAM_URL, data={
+                "chat_id": TELEGRAM_CHAT_ID,
+                "text": mensaje,
+                "parse_mode": "HTML"
+            })
+        _ultimo_alerta[tipo] = ahora
+    except Exception:
+        pass  # Si falla Telegram, no interrumpir el endpoint
+
+
+def evaluar_alertas(latencia, signal, packet_loss, uptime, caidas_hoy):
+    """Evalúa umbrales y dispara alertas si corresponde."""
+    ts = datetime.now().strftime("%H:%M:%S")
+
+    if latencia is not None and latencia > 150:
+        enviar_alerta("latencia",
+            f"⚠️ <b>WiFi Monitor — Latencia alta</b>\n"
+            f"Latencia: <b>{latencia} ms</b> (umbral: 150 ms)\n"
+            f"🕐 {ts}")
+
+    if signal is not None and signal < -75:
+        enviar_alerta("signal",
+            f"⚠️ <b>WiFi Monitor — Señal débil</b>\n"
+            f"Señal: <b>{signal} dBm</b> (umbral: -75 dBm)\n"
+            f"🕐 {ts}")
+
+    if packet_loss is not None and packet_loss > 5:
+        enviar_alerta("packet_loss",
+            f"⚠️ <b>WiFi Monitor — Packet loss elevado</b>\n"
+            f"Packet loss: <b>{packet_loss}%</b> (umbral: 5%)\n"
+            f"🕐 {ts}")
+
+    if uptime < 95:
+        enviar_alerta("uptime",
+            f"🔴 <b>WiFi Monitor — Uptime crítico</b>\n"
+            f"Uptime del día: <b>{uptime}%</b> (umbral: 95%)\n"
+            f"🕐 {ts}")
+
+    if caidas_hoy >= 5:
+        enviar_alerta("caidas",
+            f"🔴 <b>WiFi Monitor — Múltiples caídas</b>\n"
+            f"Caídas hoy: <b>{caidas_hoy}</b> (umbral: 5)\n"
+            f"🕐 {ts}")
 
 
 # --- Helpers -------------------------------------------------------------------
@@ -104,6 +171,9 @@ def get_kpis():
 
     # Caídas del día
     caidas_hoy = len(hoy[hoy["evento"] == "caida"])
+
+    # Evaluar alertas
+    evaluar_alertas(latencia_avg, signal_actual, pl_avg, uptime_pct, caidas_hoy)
 
     return {
         "estado_actual": estado_actual,
