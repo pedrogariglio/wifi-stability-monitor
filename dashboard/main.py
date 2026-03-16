@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import httpx
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -14,8 +15,8 @@ from pathlib import Path
 CSV_PATH = Path("/var/log/wifi-metrics.csv")
 
 # --- Configuración Telegram ----------------------------------------------------
-TELEGRAM_TOKEN   = "8665536298:AAHiN_Ydfgm0h28FGaIOhlV41SzCSnjRG7M"
-TELEGRAM_CHAT_ID = "5672625794"
+TELEGRAM_TOKEN   = os.getenv("TELEGRAM_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 TELEGRAM_URL     = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 
 # Cooldown: no repetir la misma alerta dentro de este tiempo
