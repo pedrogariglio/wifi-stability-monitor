@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import httpx
 import os
+import math
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -139,6 +140,12 @@ def semaforo_uptime(val):
     return "rojo"
 
 
+def clean(val):
+    if isinstance(val, float) and math.isnan(val):
+        return None
+    return val
+
+
 # --- Endpoints -----------------------------------------------------------------
 
 @app.get("/api/kpis")
@@ -217,9 +224,9 @@ def get_historico(horas: int = 6):
 
     return {
         "timestamps": df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S").tolist(),
-        "latencia_ms": df["latencia_ms"].tolist(),
-        "signal_dbm": df["signal_dbm"].tolist(),
-        "packet_loss_pct": df["packet_loss_pct"].tolist(),
+        "latencia_ms": [clean(v) for v in df["latencia_ms"].tolist()],
+        "signal_dbm": [clean(v) for v in df["signal_dbm"].tolist()],
+        "packet_loss_pct": [clean(v) for v in df["packet_loss_pct"].tolist()],
         "eventos": df["evento"].tolist()
     }
 
