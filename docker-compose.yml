@@ -16,3 +16,14 @@ services:
       - .env
     restart: unless-stopped
 
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/dashboard/Dockerfile
+    container_name: wifi-dashboard
+    ports:
+      - "8090:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
