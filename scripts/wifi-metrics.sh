@@ -29,7 +29,7 @@ SIGNAL=$(iwconfig "$IFACE" 2>/dev/null \
 
 # --- Ping: latencia, packet loss y estado ---
 PING_OUTPUT=$(ping -c 2 -W 3 "$TARGET" 2>/dev/null)
-RECEIVED=$(echo "$PING_OUTPUT" | grep -oP '\d+ received' | grep -oP '\d+')
+RECEIVED=$(echo "$PING_OUTPUT" | grep -oE '[0-9]+ received' | grep -oE '[0-9]+')
 
 # Packet loss
 case "$RECEIVED" in

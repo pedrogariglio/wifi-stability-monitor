@@ -27,3 +27,13 @@ services:
       - backend
     restart: unless-stopped
 
+  metrics:
+    build:
+      context: .
+      dockerfile: docker/metrics/Dockerfile
+    container_name: wifi-metrics
+    network_mode: host
+    volumes:
+      - /var/log/wifi-metrics.csv:/var/log/wifi-metrics.csv
+    restart: unless-stopped
+
