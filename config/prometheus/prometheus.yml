@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 15s      # cada cuánto va a buscar métricas a cada target
+  evaluation_interval: 15s  # cada cuánto evalúa reglas de alertas (futuro)
+
+scrape_configs:
+
+  - job_name: "prometheus"          # Prometheus se monitorea a sí mismo
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "node-exporter"       # métricas del OS del mini PC
+    static_configs:
+      - targets: ["host.docker.internal:9100"] # no usar IP del bridge default de Docker, porque estoy usando monitor-net
+
+  - job_name: "fastapi-backend"     # métricas de tu FastAPI (Etapa 3)
+    static_configs:
+      - targets: ["backend:8088"]   # nombre de servicio dentro de la red bridge
