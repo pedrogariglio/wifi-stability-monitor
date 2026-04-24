@@ -59,7 +59,7 @@ services:
       start_period: 60s
 
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.9.1
     container_name: wifi-node-exporter
     network_mode: host
     pid: host
@@ -75,7 +75,7 @@ services:
     restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.11.2
     container_name: wifi-prometheus
     ports:
       - "9090:9090"
