@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md
 **Proyecto:** wifi-stability-monitor  
-**Fecha de última actualización:** 2026-04-24  
+**Fecha de última actualización:** 2026-07-07  
 **Autor del handoff:** Pedro Gariglio  
 **Estado general:** ✅ Etapa 1 de observabilidad completada y validada en producción
 
@@ -174,29 +174,31 @@ Balance entre historia útil y uso de disco en un mini PC de HomeLab. Configurab
 
 ## 6. Estado del TODO
 
-> ⚠️ **Incertidumbre:** No se proporcionó `TODO.md` para este handoff. El estado a continuación se deriva exclusivamente de las sesiones de trabajo documentadas. Se recomienda reconciliar con el archivo real.
+`TODO.md` está disponible en la raíz del proyecto y fue reconciliado con este estado el 2026-07-07 (último update del TODO: 2026-04-24).
 
 ### Completado
-- Stack base dockerizado (backend FastAPI, dashboard Nginx, metrics collector)
-- Sistema de alertas Telegram con cooldown
-- Acceso remoto SSH desde Dell workstation
-- Etapa 1 observabilidad: Prometheus + Node Exporter integrados y validados
-- Seguridad: `.env.example`, `.gitignore` con excepción, versiones de imágenes fijadas
+- Etapa 1 de observabilidad completada: Prometheus + Node Exporter integrados y validados
+- Scrape jobs de Prometheus configurados y targets validados en `Status -> Targets`
+- Red explícita `monitor-net`, volumen `prometheus-data` y versionado fijo de imágenes de infraestructura
+- Reglas UFW para subnets Docker hacia puerto 9100 aplicadas y verificadas
+- Stack base operativo: backend FastAPI, dashboard Nginx, collector de métricas WiFi y alertas Telegram con cooldown
 
 ### En progreso
-- Nada en progreso activo al cierre de esta sesión
+- No hay tareas en progreso activas al último update del `TODO.md` (2026-04-24)
 
 ### Pendiente
+- **Etapa 1 (pendientes residuales):**
+  - Aprender queries básicas en PromQL
+  - Agregar healthchecks para `node-exporter` y `prometheus`
 - **Etapa 2:** Grafana — dashboards visuales sobre métricas de Prometheus
 - **Etapa 3:** Métricas custom en FastAPI — exponer `/metrics` con `prometheus-client`
 - **Etapa 4:** Alertmanager — alertas desde Prometheus (complementario al sistema Telegram actual)
+- **Etapa 5:** Loki — centralización de logs del stack
 - Migración de secretos a archivos bajo `./secrets/` en lugar de variables de entorno
 - `chmod 600 .env` en el servidor
-- Healthchecks para `node-exporter` y `prometheus` en `docker-compose.yml`
 - Implementar `gitleaks` o pre-commit hook para detección de secretos
 
 ### Futuras mejoras identificadas
-- Loki para centralización de logs
 - DisplayPort dummy plug para resolver boot headless del HP EliteDesk (BIOS requiere display físico para POST)
 - TP-Link TL-SG2008 JetStream Smart Switch para VLANs y SNMP v3
 - Segundo nodo compute para cluster Proxmox
