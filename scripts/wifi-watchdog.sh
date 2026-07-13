@@ -13,7 +13,7 @@ while true; do
         echo "$(date) - OK - Internet activo" >> "$LOG"
     else
         echo "$(date) - ERROR - Sin conectividad. Ejecutando reparación..." >> "$LOG"
-        /home/pedrogariglio/scripts/wifi-fix.sh >> "$LOG" 2>&1
+        /usr/local/bin/wifi-fix.sh >> "$LOG" 2>&1
         echo "$(date) - Reparación ejecutada" >> "$LOG"
     fi
     sleep $INTERVAL
