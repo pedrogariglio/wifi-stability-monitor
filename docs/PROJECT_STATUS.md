@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md
 **Proyecto:** wifi-stability-monitor  
-**Fecha de última actualización:** 2026-07-07  
+**Fecha de última actualización:** 2026-07-14  
 **Autor del handoff:** Pedro Gariglio  
 **Estado general:** ✅ Etapa 1 de observabilidad completada y validada en producción
 
@@ -29,7 +29,7 @@
 
 | Servicio | Container | Imagen | Puerto externo | Red | Función |
 |---|---|---|---|---|---|
-| `backend` | `wifi-backend` | Build local | `8088:8088` | `monitor-net` | FastAPI — API REST y lógica de alertas Telegram |
+| `backend` | `wifi-backend` | Build local | — (solo interno en `monitor-net`) | `monitor-net` | FastAPI — API REST y lógica de alertas Telegram |
 | `dashboard` | `wifi-dashboard` | Build local | `8090:80` | `monitor-net` | Nginx — sirve el frontend del dashboard |
 | `metrics` | `wifi-metrics` | Build local | — | `host` | Crond Alpine — recolecta métricas WiFi al CSV |
 | `node-exporter` | `wifi-node-exporter` | `prom/node-exporter:v1.9.1` | — | `host` | Expone métricas del OS en `:9100/metrics` |
@@ -69,7 +69,7 @@ host:
 [/var/log/wifi-metrics.csv]
         ↓ lee (ro)
 [wifi-backend: FastAPI :8088]
-        ↓ sirve
+        ↓ proxy interno `/api/*`
 [wifi-dashboard: Nginx :80 → :8090]
         ↓ alertas
 [Telegram Bot API]
@@ -118,6 +118,7 @@ wifi-node-exporter → independiente (host mode)
 - UFW bloqueaba tráfico desde containers bridge hacia host (puerto 9100)
 - `host.docker.internal` no resolvía correctamente en Linux con red explícita
 - Identidad Git y SSH no configuradas en la Dell workstation
+- `nginx.conf` existía pero no estaba activo en la imagen del dashboard; ahora se copia en build y el frontend consume `/api/*` vía rutas relativas
 
 ---
 
@@ -169,12 +170,13 @@ Balance entre historia útil y uso de disco en un mini PC de HomeLab. Configurab
 | Git commits fallaban en la Dell | Identidad de Git (`user.email`, `user.name`) no configurada globalmente | `git config --global user.email` y `user.name` | Configurar identidad Git es el primer paso en cualquier máquina nueva |
 | `git push` fallaba con `Permission denied (publickey)` | Clave SSH de la Dell no estaba registrada en GitHub | Agregar `~/.ssh/id_ed25519.pub` en GitHub → Settings → SSH keys | Verificar `ssh -T git@github.com` antes de intentar push en máquina nueva |
 | `version: "3.9"` deprecation warning | Campo obsoleto en Docker Compose v2 | Eliminado del `docker-compose.yml` | Compose v2 no requiere ni recomienda el campo `version` |
+| Proxy Nginx de `/api` no operaba en runtime | `nginx.conf` no estaba incorporado a la imagen y el frontend llamaba directo a `:8088` | Copiar `nginx.conf` en `docker/dashboard/Dockerfile`, migrar frontend a rutas relativas `/api/*` y cerrar exposición host del backend (`expose: 8088` sin `ports`) | Un proxy no existe hasta que su config entra en la imagen y se retira el bypass directo al backend |
 
 ---
 
 ## 6. Estado del TODO
 
-`TODO.md` está disponible en la raíz del proyecto y fue reconciliado con este estado el 2026-07-07 (último update del TODO: 2026-04-24).
+`TODO.md` está disponible en la raíz del proyecto y fue reconciliado con este estado el 2026-07-14 (último update del TODO: 2026-07-14).
 
 ### Completado
 - Etapa 1 de observabilidad completada: Prometheus + Node Exporter integrados y validados
@@ -182,6 +184,7 @@ Balance entre historia útil y uso de disco en un mini PC de HomeLab. Configurab
 - Red explícita `monitor-net`, volumen `prometheus-data` y versionado fijo de imágenes de infraestructura
 - Reglas UFW para subnets Docker hacia puerto 9100 aplicadas y verificadas
 - Stack base operativo: backend FastAPI, dashboard Nginx, collector de métricas WiFi y alertas Telegram con cooldown
+- Nginx definido como punto de entrada del frontend y proxy interno hacia backend (`/api/*`)
 
 ### En progreso
 - No hay tareas en progreso activas al último update del `TODO.md` (2026-04-24)
@@ -234,6 +237,7 @@ El archivo existe en el host fuera del control de Docker. Si se borra o cambia d
 | `fastapi-backend` scrape job DOWN | Baja | Esperado hasta Etapa 3, pero genera ruido en la UI de Prometheus |
 | Sin rotación de logs del CSV | Media | El CSV crece indefinidamente. Sin logrotate configurado puede llenar el disco en el largo plazo |
 | Imágenes locales sin tag | Baja | Las imágenes buildeadas localmente (`wifi-backend`, `wifi-dashboard`, `wifi-metrics`) no tienen versión explícita |
+| Bind mount CSV puede apuntar a directorio | Media | Si `/var/log/wifi-metrics.csv` es directorio en host, backend responde 500 (`IsADirectoryError`) hasta corregir el path |
 
 ---
 

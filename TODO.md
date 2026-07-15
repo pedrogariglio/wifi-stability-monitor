@@ -1,5 +1,5 @@
 # TODO — wifi-stability-monitor
-**Última actualización:** 2026-04-24
+**Última actualización:** 2026-07-15
 
 ---
 
@@ -17,7 +17,7 @@
 - [x] Agregar reglas UFW para subnets Docker (`172.17.0.0/16`, `172.18.0.0/16`) hacia puerto 9100
 - [x] Validar targets en `Status → Targets` de la UI de Prometheus
 - [x] Validar métricas de Node Exporter desde dentro del container
-- [ ] Aprender queries básicas en PromQL sobre métricas disponibles
+- [x] Aprender queries básicas en PromQL sobre métricas disponibles
 - [ ] Agregar healthchecks para `node-exporter` y `prometheus` en `docker-compose.yml`
 
 ### Etapa 2 — Grafana
@@ -70,6 +70,8 @@
 - [ ] Agregar tags de versión a las imágenes buildeadas localmente (`wifi-backend`, `wifi-dashboard`, `wifi-metrics`)
 - [ ] Revisar si `network_mode: host` en `metrics` puede reemplazarse por `cap_add: NET_RAW` + red bridge (reducir superficie de ataque)
 - [ ] Documentar el nombre de interfaz `wlp6s0` en un `.env` o variable de entorno para evitar hardcoding en `wifi-metrics.sh`
+- [x] Activar proxy real de Nginx (`/api`) y eliminar bypass del frontend al backend
+- [ ] Endurecer preflight de datos: validar que `/var/log/wifi-metrics.csv` sea archivo regular (no directorio) antes de iniciar backend/metrics
 
 ---
 

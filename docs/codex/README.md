@@ -6,7 +6,7 @@ Este directorio contiene el registro de interacciones con Codex.
 
 - raw/: sesiones crudas exportadas desde Codex
 - processed/: sesiones resumidas y estructuradas
-- insights.md: aprendizajes acumulados del proyecto
+- insights/: manual técnico acumulativo por dominio (`docker.md`, `linux.md`, `networking.md`, `prometheus.md`, `debugging.md`)
 
 ## Objetivo
 
