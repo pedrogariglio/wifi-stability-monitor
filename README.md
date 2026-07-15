@@ -1,6 +1,6 @@
 # wifi-stability-monitor
 
-Sistema de monitoreo y autorecuperación de conexión WiFi en Linux. Detecta problemas de conectividad, intenta recuperarla automáticamente y recopila métricas de estabilidad para análisis y visualización.
+Sistema de monitoreo de conexión WiFi en Linux. Detecta problemas de conectividad, recopila métricas de estabilidad y las expone en un dashboard web con alertas automáticas por Telegram.
 
 Proyecto de aprendizaje en administración de sistemas Linux, automatización y observabilidad.
 
@@ -19,25 +19,22 @@ Se probaron soluciones manuales (reinicio de NetworkManager, desactivación del 
 
 ---
 
-## Arquitectura
+## Arquitectura (Docker-first)
 
 ```
 Capa de recolección
-├── wifi-watchdog.sh      → detecta caídas y ejecuta recuperación automática
-└── wifi-metrics.sh       → registra latencia, señal y estado cada 30 segundos
+└── container wifi-metrics (crond) → ejecuta wifi-metrics.sh cada 30 segundos
 
 Capa de almacenamiento
-└── /var/log/wifi-metrics.csv   → fuente única de verdad (histórico)
+└── /var/log/wifi-metrics.csv (host) → bind mount compartido entre collector y backend
 
-Capa de automatización
-├── wifi-watchdog.service       → servicio continuo (Restart=always)
-├── wifi-metrics.service        → ejecución puntual (Type=oneshot)
-└── wifi-metrics.timer          → dispara wifi-metrics.service cada 30s
+Capa de aplicación
+├── container wifi-backend (FastAPI :8088)   → KPIs, histórico y alertas Telegram
+└── container wifi-dashboard (Nginx :8090)   → frontend operativo de visualización
 
-Capa de observabilidad (en desarrollo)
-├── FastAPI                     → backend que lee el CSV y sirve JSON
-├── Dashboard web               → KPIs, semáforos y gráficos en tiempo real (Plotly)
-└── Telegram Bot                → alertas automáticas por umbral
+Capa de observabilidad
+├── container wifi-prometheus (:9090)        → scraping y TSDB (15 días)
+└── container wifi-node-exporter (host mode) → métricas del OS host
 ```
 
 ---
@@ -46,30 +43,35 @@ Capa de observabilidad (en desarrollo)
 
 ```
 wifi-stability-monitor/
+├── docker-compose.yml
+├── config/
+│   └── prometheus/prometheus.yml
 ├── scripts/
+│   ├── init-server.sh          # Inicialización del servidor (ejecutar antes del primer deploy)
 │   ├── wifi-watchdog.sh        # Watchdog de autorecuperación
 │   ├── wifi-metrics.sh         # Recolección de métricas
 │   ├── wifi-fix.sh             # Reparación manual de la interfaz
 │   └── wifi-status.sh          # Diagnóstico del estado WiFi
-├── systemd/
-│   ├── wifi-watchdog.service
-│   ├── wifi-metrics.service
-│   └── wifi-metrics.timer
-├── logrotate/
-│   └── wifi-watchdog           # Configuración de rotación de logs
-├── analysis/                   # (próxima fase) Scripts Python de análisis
-└── dashboard/                  # (próxima fase) FastAPI + Plotly
+├── dashboard/
+│   ├── main.py                 # Backend FastAPI
+│   └── dashboard.html          # Frontend web
+├── docker/
+│   ├── backend/
+│   ├── dashboard/
+│   └── metrics/
+└── docs/
 ```
 
 ---
 
-## Instalación
+## Instalación y despliegue
 
 ### Requisitos
 
 - Ubuntu Linux (probado en 22.04 / 24.04)
-- `iwconfig` (paquete `wireless-tools`)
-- Interfaz WiFi activa (ajustar `IFACE` en los scripts si es distinta de `wlp6s0`)
+- Docker Engine + Docker Compose v2
+- UFW activo (configuración restrictiva — ver nota más abajo)
+- Interfaz WiFi activa en el host (por defecto `wlp6s0`)
 
 ### 1. Clonar el repositorio
 
@@ -78,47 +80,45 @@ git clone https://github.com/pedrogariglio/wifi-stability-monitor.git
 cd wifi-stability-monitor
 ```
 
-### 2. Instalar los scripts
+### 2. Configurar variables de entorno
 
 ```bash
-sudo cp scripts/wifi-watchdog.sh /usr/local/bin/wifi-watchdog.sh
-sudo cp scripts/wifi-metrics.sh /usr/local/bin/wifi-metrics.sh
-sudo cp scripts/wifi-fix.sh /usr/local/bin/wifi-fix.sh
-sudo cp scripts/wifi-status.sh /usr/local/bin/wifi-status.sh
-sudo chmod +x /usr/local/bin/wifi-*.sh
+cp .env.example .env
+# completar TELEGRAM_TOKEN y TELEGRAM_CHAT_ID
 ```
 
-### 3. Instalar los servicios systemd
+### 3. Inicializar el servidor
+
+Este paso es obligatorio antes del primer `docker compose up`. Crea el archivo CSV con su cabecera y configura las reglas de UFW necesarias para que Prometheus alcance a Node Exporter.
 
 ```bash
-sudo cp systemd/wifi-watchdog.service /etc/systemd/system/
-sudo cp systemd/wifi-metrics.service /etc/systemd/system/
-sudo cp systemd/wifi-metrics.timer /etc/systemd/system/
-
-sudo systemctl daemon-reload
-
-# Watchdog: servicio continuo
-sudo systemctl enable wifi-watchdog.service
-sudo systemctl start wifi-watchdog.service
-
-# Métricas: activar el timer
-sudo systemctl enable wifi-metrics.timer
-sudo systemctl start wifi-metrics.timer
+chmod +x scripts/init-server.sh
+sudo ./scripts/init-server.sh
 ```
 
-### 4. Configurar logrotate
+> **Nota UFW:** el stack usa `network_mode: host` para Node Exporter y el collector de métricas. Con UFW en política `deny (incoming)`, el tráfico desde containers bridge hacia el host queda bloqueado por defecto. El script de inicialización agrega las reglas necesarias para las subnets Docker (`172.17.0.0/16` y `172.18.0.0/16`) hacia el puerto 9100.
+
+### 4. Levantar el stack
 
 ```bash
-sudo cp logrotate/wifi-watchdog /etc/logrotate.d/wifi-watchdog
+docker compose up -d --build
 ```
 
-### 5. Verificar que todo esté activo
+### 5. Verificar estado
 
 ```bash
-systemctl status wifi-watchdog.service
-systemctl status wifi-metrics.timer
-cat /var/log/wifi-metrics.csv
+docker compose ps
+docker compose logs metrics --tail=50
+tail -5 /var/log/wifi-metrics.csv
 ```
+
+### 6. Accesos
+
+| Servicio | URL |
+|---|---|
+| Dashboard | `http://<host>:8090` |
+| Prometheus | `http://<host>:9090` |
+| Backend API | `http://<host>:8088` |
 
 ---
 
@@ -129,14 +129,15 @@ El archivo `/var/log/wifi-metrics.csv` registra una línea cada 30 segundos:
 | Campo | Descripción | Ejemplo |
 |---|---|---|
 | `timestamp` | Fecha y hora del registro | `2026-03-12 17:50:17` |
-| `estado` | `conectado` o `desconectado` | `conectado` |
+| `estado` | `conectado`, `degradado` o `desconectado` | `conectado` |
 | `latencia_ms` | Latencia promedio al ping (ms) | `26` |
-| `signal_dbm` | Potencia de señal WiFi | `-56` |
-| `evento` | `ok`, `caida` o `reconectado` | `ok` |
+| `signal_dbm` | Potencia de señal WiFi (dBm) | `-56` |
+| `packet_loss_pct` | Porcentaje de paquetes perdidos | `0` |
+| `evento` | `ok`, `degradado` o `caida` | `ok` |
 
 ---
 
-## KPIs y umbrales (dashboard en desarrollo)
+## KPIs y umbrales (dashboard operativo)
 
 | KPI | Verde | Amarillo | Rojo |
 |---|---|---|---|
@@ -149,31 +150,27 @@ El archivo `/var/log/wifi-metrics.csv` registra una línea cada 30 segundos:
 
 ## Estado del proyecto
 
-- [x] Watchdog de autorecuperación con servicio systemd
-- [x] Recolección de métricas en CSV cada 30 segundos
-- [x] Rotación automática de logs con logrotate
-- [ ] Ampliación de métricas: packet loss y throughput
-- [ ] Script de análisis en Python (uptime, caídas por día, promedios)
-- [ ] Dashboard web con FastAPI + Plotly (tiempo real)
-- [ ] Alertas automáticas por Telegram
+- [x] Stack Docker operativo (`metrics`, `backend`, `dashboard`, `prometheus`, `node-exporter`)
+- [x] Recolección de métricas en CSV cada 30 segundos (latencia, señal, packet loss, estado)
+- [x] Dashboard web operativo con KPIs y gráficos en tiempo real
+- [x] Alertas automáticas por Telegram con cooldown
+- [x] Proxy Nginx correctamente configurado (frontend → `/api` → backend)
+- [x] Etapa 1 de observabilidad completada (Prometheus + Node Exporter)
+- [ ] Etapa 2: Grafana
+- [ ] Etapa 3: endpoint `/metrics` en FastAPI con `prometheus-client`
+- [ ] Etapa 4: Alertmanager
+- [ ] Etapa 5: Loki
 
 ---
 
-## Hardware utilizado
+## Hardware
 
-- **Mini PC:** HP EliteDesk (Intel Core i5 vPro) — Ubuntu Linux
-- **Interfaz WiFi:** `wlp6s0` (driver `iwlwifi`)
-- **Router:** router doméstico del proveedor de internet
-
----
-
-## Aprendizajes aplicados
-
-- Filesystem Hierarchy Standard (FHS) de Linux
-- Gestión de servicios con `systemd` (`Type=simple`, `Type=oneshot`, timers)
-- Rotación de logs con `logrotate`
-- Scripting en bash para automatización del sistema
-- Observabilidad: recolección y análisis de métricas de infraestructura
+| Componente | Detalle |
+|---|---|
+| Mini PC | HP EliteDesk (Intel Core i5 vPro) — Ubuntu Server 24.04 LTS headless |
+| Interfaz WiFi | `wlp6s0` (driver `iwlwifi`) |
+| Switch (próximamente) | TP-Link TL-SG2008 JetStream (managed, VLAN, SNMP v3) |
+| Router | Router doméstico del proveedor de internet |
 
 ---
 
