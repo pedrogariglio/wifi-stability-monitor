@@ -73,7 +73,12 @@ services:
       - "--path.rootfs=/host/root"
       - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
     restart: unless-stopped
-
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:9100/metrics | grep -q '^node_exporter_build_info'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
   prometheus:
     image: prom/prometheus:v3.11.2
     container_name: wifi-prometheus
@@ -94,7 +99,12 @@ services:
     restart: unless-stopped
     networks:
       - monitor-net
-
+    healthcheck: 
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 networks:
   monitor-net:
     driver: bridge
