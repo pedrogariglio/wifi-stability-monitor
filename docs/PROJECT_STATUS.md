@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md
 **Proyecto:** wifi-stability-monitor  
-**Fecha de última actualización:** 2026-07-14  
+**Fecha de última actualización:** 2026-07-21  
 **Autor del handoff:** Pedro Gariglio  
 **Estado general:** ✅ Etapa 1 de observabilidad completada y validada en producción
 
@@ -18,6 +18,7 @@
 - Dashboard web accesible remotamente vía Nginx
 - Alertas por Telegram con lógica de cooldown
 - Stack de observabilidad con Prometheus y Node Exporter (Etapa 1 completada)
+- Grafana desplegado con datasource Prometheus configurado
 
 **Alcance futuro:** visualización en Grafana, métricas custom de FastAPI, alertas desde Alertmanager, centralización de logs con Loki.
 
@@ -34,6 +35,7 @@
 | `metrics` | `wifi-metrics` | Build local | — | `host` | Crond Alpine — recolecta métricas WiFi al CSV |
 | `node-exporter` | `wifi-node-exporter` | `prom/node-exporter:v1.9.1` | — | `host` | Expone métricas del OS en `:9100/metrics` |
 | `prometheus` | `wifi-prometheus` | `prom/prometheus:v3.11.2` | `9090:9090` | `monitor-net` | Scraping, almacenamiento y consulta de métricas |
+| `grafana` | `wifi-grafana` | `grafana/grafana:11.0.0` | `3000:3000` | `monitor-net` | Visualización de métricas con datasource Prometheus |
 
 ### Redes Docker
 
@@ -104,6 +106,8 @@ wifi-node-exporter → independiente (host mode)
 | Alertas Telegram | ✅ Funcionando | Lógica de cooldown implementada |
 | Prometheus | ✅ UP | Validado en `Status → Targets`, se monitorea a sí mismo |
 | Node Exporter | ✅ UP | 1502 líneas de métricas validadas desde dentro del container |
+| Grafana (base) | ✅ UP | UI responde en `:3000` (HTTP 302 esperado al login) |
+| Grafana datasource | ✅ Configurado | Prometheus configurado y online como datasource en Grafana |
 | Red `monitor-net` | ✅ Funcionando | Creada y operativa |
 | Volumen `prometheus-data` | ✅ Creado | Persistencia de TSDB activa |
 
@@ -176,7 +180,7 @@ Balance entre historia útil y uso de disco en un mini PC de HomeLab. Configurab
 
 ## 6. Estado del TODO
 
-`TODO.md` está disponible en la raíz del proyecto y fue reconciliado con este estado el 2026-07-14 (último update del TODO: 2026-07-14).
+`TODO.md` está disponible en la raíz del proyecto y fue reconciliado con este estado el 2026-07-21 (último update del TODO: 2026-07-21).
 
 ### Completado
 - Etapa 1 de observabilidad completada: Prometheus + Node Exporter integrados y validados
@@ -185,15 +189,16 @@ Balance entre historia útil y uso de disco en un mini PC de HomeLab. Configurab
 - Reglas UFW para subnets Docker hacia puerto 9100 aplicadas y verificadas
 - Stack base operativo: backend FastAPI, dashboard Nginx, collector de métricas WiFi y alertas Telegram con cooldown
 - Nginx definido como punto de entrada del frontend y proxy interno hacia backend (`/api/*`)
+- Inicio de Etapa 2: Grafana agregado en `docker-compose.yml` con versión fija y volumen persistente
+- Datasource de Prometheus configurado en Grafana
+- PromQL básico aprendido sobre métricas disponibles
+- Healthchecks agregados para `node-exporter` y `prometheus`
 
 ### En progreso
 - No hay tareas en progreso activas al último update del `TODO.md` (2026-04-24)
 
 ### Pendiente
-- **Etapa 1 (pendientes residuales):**
-  - Aprender queries básicas en PromQL
-  - Agregar healthchecks para `node-exporter` y `prometheus`
-- **Etapa 2:** Grafana — dashboards visuales sobre métricas de Prometheus
+- **Etapa 2:** Grafana — pendiente crear dashboards (OS y métricas WiFi)
 - **Etapa 3:** Métricas custom en FastAPI — exponer `/metrics` con `prometheus-client`
 - **Etapa 4:** Alertmanager — alertas desde Prometheus (complementario al sistema Telegram actual)
 - **Etapa 5:** Loki — centralización de logs del stack
@@ -233,7 +238,6 @@ El archivo existe en el host fuera del control de Docker. Si se borra o cambia d
 | Item | Severidad | Descripción |
 |---|---|---|
 | Secretos como variables de entorno | Media | TELEGRAM_TOKEN visible en `docker inspect`. Migrar a archivos bajo `./secrets/` |
-| Sin healthcheck en `node-exporter` y `prometheus` | Baja | `docker compose ps` no muestra estado de salud para estos servicios |
 | `fastapi-backend` scrape job DOWN | Baja | Esperado hasta Etapa 3, pero genera ruido en la UI de Prometheus |
 | Sin rotación de logs del CSV | Media | El CSV crece indefinidamente. Sin logrotate configurado puede llenar el disco en el largo plazo |
 | Imágenes locales sin tag | Baja | Las imágenes buildeadas localmente (`wifi-backend`, `wifi-dashboard`, `wifi-metrics`) no tienen versión explícita |
@@ -244,11 +248,11 @@ El archivo existe en el host fuera del control de Docker. Si se borra o cambia d
 ## 8. Próximos Pasos Recomendados
 
 ### Próxima sesión
-1. **PromQL básico** — aprender queries sobre métricas de Node Exporter ya disponibles: CPU, memoria, disco, red
-2. **Healthchecks para Prometheus y Node Exporter** — completar paridad con los otros servicios
+1. **Primer dashboard de OS** — crear panel base de CPU, memoria, disco y red
+2. **Dashboard WiFi custom** — definir paneles sobre latencia, señal, packet loss y eventos
 
 ### Próximas 2 semanas
-3. **Etapa 2: Grafana** — agregar servicio al `docker-compose.yml`, conectar a Prometheus como datasource, crear primer dashboard con métricas del OS
+3. **Etapa 2: Grafana** — completar dashboards visuales sobre métricas de Prometheus
 4. **Migración de secretos** — mover TELEGRAM_TOKEN y TELEGRAM_CHAT_ID a `./secrets/` con patrón `read_secret()` en FastAPI
 
 ### Largo plazo
@@ -294,6 +298,7 @@ Esperado:
 
 ### Verificar Node Exporter directamente
 ```bash
+# Desde el servidor
 curl http://localhost:9100/metrics | head -5
 ```
 
@@ -343,4 +348,4 @@ docker compose up -d
 
 ## 10. Resumen Ejecutivo
 
-`wifi-stability-monitor` es un stack Docker multi-container que monitorea la estabilidad WiFi de un HomeLab en un HP EliteDesk con Ubuntu Server 24.04 headless. El core del sistema — recolección de métricas cada 30 segundos, dashboard web, y alertas Telegram con cooldown — está completamente operativo. La Etapa 1 del stack de observabilidad fue completada en la sesión del 24/04/2026: Prometheus v3.11.2 y Node Exporter v1.9.1 están integrados, desplegados y validados en producción. El principal obstáculo encontrado fue UFW bloqueando el tráfico desde containers bridge hacia el host en el puerto 9100, resuelto con reglas explícitas para las subnets Docker. La arquitectura usa una red bridge explícita `monitor-net` para los servicios principales y `network_mode: host` para los collectors que necesitan acceso a interfaces de red reales. Los secretos se gestionan con `.env` excluido de git. Las imágenes de infraestructura tienen versiones fijadas. El acceso remoto desde la Dell workstation funciona via SSH y Nginx. El próximo paso inmediato es aprender PromQL sobre las métricas ya disponibles, seguido de Grafana como Etapa 2 de observabilidad. La deuda técnica más relevante es la migración de secretos de variables de entorno a archivos montados.
+`wifi-stability-monitor` es un stack Docker multi-container que monitorea la estabilidad WiFi de un HomeLab en un HP EliteDesk con Ubuntu Server 24.04 headless. El core del sistema — recolección de métricas cada 30 segundos, dashboard web, y alertas Telegram con cooldown — está completamente operativo. La Etapa 1 del stack de observabilidad fue completada con Prometheus v3.11.2 y Node Exporter v1.9.1 integrados y validados en producción. El principal obstáculo encontrado fue UFW bloqueando el tráfico desde containers bridge hacia el host en el puerto 9100, resuelto con reglas explícitas para las subnets Docker. La arquitectura usa una red bridge explícita `monitor-net` para los servicios principales y `network_mode: host` para los collectors que necesitan acceso a interfaces de red reales. Los secretos se gestionan con `.env` excluido de git. Las imágenes de infraestructura tienen versiones fijadas. El acceso remoto desde la Dell workstation funciona via SSH y Nginx. La Etapa 2 ya inició: Grafana está desplegado con persistencia y datasource Prometheus configurado. El siguiente paso inmediato es construir dashboards (OS y WiFi). La deuda técnica más relevante sigue siendo la migración de secretos de variables de entorno a archivos montados.

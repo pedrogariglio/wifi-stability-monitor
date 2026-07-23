@@ -4,7 +4,7 @@
 
 ### Sintoma
 
-- `curl http://localhost:8090/api/kpis` devuelve `500`.
+- Desde el servidor (CLI local), `curl http://localhost:8090/api/kpis` devuelve `500`.
 - En logs del backend aparece:
   - `IsADirectoryError: [Errno 21] Is a directory: '/var/log/wifi-metrics.csv'`
 
@@ -31,6 +31,7 @@ docker compose restart metrics backend dashboard
 ### Verificacion
 
 ```bash
+# Desde el servidor (CLI local)
 tail -5 /var/log/wifi-metrics.csv
 curl -i http://localhost:8090/api/kpis
 ```

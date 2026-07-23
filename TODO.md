@@ -1,5 +1,5 @@
 # TODO — wifi-stability-monitor
-**Última actualización:** 2026-07-15
+**Última actualización:** 2026-07-21
 
 ---
 
@@ -18,16 +18,16 @@
 - [x] Validar targets en `Status → Targets` de la UI de Prometheus
 - [x] Validar métricas de Node Exporter desde dentro del container
 - [x] Aprender queries básicas en PromQL sobre métricas disponibles
-- [ ] Agregar healthchecks para `node-exporter` y `prometheus` en `docker-compose.yml`
+- [x] Agregar healthchecks para `node-exporter` y `prometheus` en `docker-compose.yml`
 
 ### Etapa 2 — Grafana
-- [ ] Agregar servicio `grafana` en `docker-compose.yml`
-- [ ] Configurar Prometheus como datasource en Grafana
+- [x] Agregar servicio `grafana` en `docker-compose.yml`
+- [x] Configurar Prometheus como datasource en Grafana
 - [ ] Crear dashboard con métricas del OS (CPU, RAM, disco, red)
 - [ ] Crear dashboard con métricas WiFi custom (cuando estén disponibles)
-- [ ] Fijar versión de imagen de Grafana
-- [ ] Agregar volumen nombrado para persistencia de dashboards
-- [ ] Exponer Grafana via Nginx o acceso directo por puerto
+- [x] Fijar versión de imagen de Grafana
+- [x] Agregar volumen nombrado para persistencia de dashboards
+- [x] Exponer Grafana via Nginx o acceso directo por puerto
 
 ### Etapa 3 — Métricas custom en FastAPI
 - [ ] Agregar `prometheus-client` al `requirements.txt` del backend

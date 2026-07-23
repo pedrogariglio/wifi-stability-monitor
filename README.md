@@ -118,7 +118,8 @@ tail -5 /var/log/wifi-metrics.csv
 |---|---|
 | Dashboard | `http://<host>:8090` |
 | Prometheus | `http://<host>:9090` |
-| Backend API | `http://<host>:8088` |
+| Grafana | `http://<host>:3000` |
+| Backend API (interno) | `http://backend:8088` (solo red Docker `monitor-net`) |
 
 ---
 
@@ -156,7 +157,7 @@ El archivo `/var/log/wifi-metrics.csv` registra una línea cada 30 segundos:
 - [x] Alertas automáticas por Telegram con cooldown
 - [x] Proxy Nginx correctamente configurado (frontend → `/api` → backend)
 - [x] Etapa 1 de observabilidad completada (Prometheus + Node Exporter)
-- [ ] Etapa 2: Grafana
+- [~] Etapa 2: Grafana (servicio base desplegado, falta datasource y dashboards)
 - [ ] Etapa 3: endpoint `/metrics` en FastAPI con `prometheus-client`
 - [ ] Etapa 4: Alertmanager
 - [ ] Etapa 5: Loki
